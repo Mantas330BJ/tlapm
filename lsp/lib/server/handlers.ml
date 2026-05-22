@@ -7,6 +7,8 @@ module type Callbacks = sig
   val ready : t -> t
   val shutdown : t -> t
   val lsp_send : t -> Jsonrpc.Packet.t -> t
+  val send_lint_diagnostics : t -> LspT.DocumentUri.t -> int -> t
+
   val with_docs : t -> (t -> Docs.t -> t * Docs.t) -> t
 
   val with_docs_res :
@@ -58,9 +60,11 @@ module Make (CB : Callbacks) = struct
         let vsn = params.textDocument.version in
         let text = params.textDocument.text in
         Eio.traceln "DOCUMENT[Open]: %s => %s" (DocumentUri.to_string uri) text;
-        CB.with_docs cb_state @@ fun cb_st docs ->
-        let docs = Docs.add docs uri vsn text in
-        (cb_st, docs)
+        let cb_state =
+          CB.with_docs cb_state @@ fun cb_st docs ->
+          (cb_st, Docs.add docs uri vsn text)
+        in
+        CB.send_lint_diagnostics cb_state uri vsn
     | Ok (TextDocumentDidChange params) -> (
         let uri = params.textDocument.uri in
         let vsn = params.textDocument.version in
@@ -69,8 +73,11 @@ module Make (CB : Callbacks) = struct
             Eio.traceln "DOCUMENT[Change]: %s => %s"
               (DocumentUri.to_string uri)
               text;
-            CB.with_docs cb_state @@ fun cb_st docs ->
-            (cb_st, Docs.add docs uri vsn text)
+            let cb_state =
+              CB.with_docs cb_state @@ fun cb_st docs ->
+              (cb_st, Docs.add docs uri vsn text)
+            in
+            CB.send_lint_diagnostics cb_state uri vsn
         | _ -> failwith "incremental changes not supported")
     | Ok (TextDocumentDidClose params) ->
         let uri = params.textDocument.uri in

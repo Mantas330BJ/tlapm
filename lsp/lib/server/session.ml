@@ -85,6 +85,15 @@ module ProverProgress = Prover.Progress.Make (struct
     { st with progress }
 end)
 
+(** Run the parse-driven lint analysis on the latest parsed module for [uri].
+    Returns the (possibly mutated) session and the lint diagnostics. *)
+let compute_lint_diagnostics st uri =
+  let docs, res =
+    Docs.on_parsed_mule_latest st.docs uri (fun _vsn mule _ps ->
+        Some (Analysis.Redundant_usables.Diagnostics.find mule))
+  in
+  ({ st with docs }, Option.value ~default:[] res)
+
 let send_diagnostics diagnostics st uri vsn =
   let open LspT in
   let d_par =
@@ -147,11 +156,24 @@ let send_proof_info st uri vsn res =
       in
       (* And then the diagnostics and markers. *)
       let diags, marks = Docs.Doc_proof_res.as_lsp res in
-      send_diagnostics diags st uri vsn;
+      let st, lint_diags = compute_lint_diagnostics st uri in
+      send_diagnostics (lint_diags @ diags) st uri vsn;
       send_proof_state_markers marks st uri;
       let delayed = DocUriSet.remove uri st.delayed in
       { st with delayed }
   | None -> st
+
+let send_lint_diagnostics st uri vsn =
+  let st, lint_diags = compute_lint_diagnostics st uri in
+  let docs, _vsn_opt, proof_res_opt = Docs.get_proof_res_latest st.docs uri in
+  let st = { st with docs } in
+  let prover_diags =
+    match proof_res_opt with
+    | Some res -> fst (Docs.Doc_proof_res.as_lsp res)
+    | None -> []
+  in
+  send_diagnostics (lint_diags @ prover_diags) st uri vsn;
+  st
 
 let send_latest_proof_info st uri =
   let docs, vsn_opt, proof_res_opt = Docs.get_proof_res_latest st.docs uri in
@@ -185,6 +207,7 @@ module SessionHandlers = Handlers.Make (struct
     | Shutdown -> st
 
   let lsp_send = lsp_send
+  let send_lint_diagnostics = send_lint_diagnostics
   let with_docs = with_docs
   let with_docs_res = with_docs_res
 

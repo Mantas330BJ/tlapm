@@ -6,3 +6,10 @@
  (deps ../bin/tlapm_lsp.exe)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
+
+(test
+ (name test_redundant)
+ (build_if
+  (>= %{ocaml_version}, "5.0.0"))
+ (libraries tlapm_lsp_lib alcotest core)
+ (deps (source_tree ../resources)))

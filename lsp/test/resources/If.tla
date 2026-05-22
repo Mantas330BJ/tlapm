@@ -1,0 +1,5 @@
+---- MODULE If ----
+X == 5
+
+THEOREM IF X = 5 THEN TRUE ELSE FALSE BY DEF X
+====

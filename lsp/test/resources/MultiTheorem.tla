@@ -1,0 +1,8 @@
+---- MODULE MultiTheorem ----
+EXTENDS Naturals, TLC
+
+X == 1
+THEOREM TRUE BY DEF X
+
+THEOREM TRUE BY DEF X
+====

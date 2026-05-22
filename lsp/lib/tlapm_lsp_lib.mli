@@ -8,3 +8,6 @@ module Server : sig
     string Eio.Std.Promise.t ->
     unit
 end
+
+module Parser = Parser
+module Analysis = Analysis
